@@ -1,5 +1,5 @@
 # t5-pegasus pytorch
-追一科技开源的[t5-pegasus](https://github.com/ZhuiyiTechnology/t5-pegasus)的pytoch版本
+追一科技开源的[t5-pegasus](https://github.com/ZhuiyiTechnology/t5-pegasus)的pytorch版本
 ## 下载
 
 - 百度网盘: https://pan.baidu.com/s/1yv9rVGjEmV8NJcIgm5farA 提取码: rpux
