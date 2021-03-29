@@ -6,6 +6,7 @@
 - samll版本 百度网盘：https://pan.baidu.com/s/1vhqgjTNACo1Upu6TYWITeQ 提取码：3wzc
 ## how to use
 pytorch1.7.0 + transformers4.3.3
+
 ```python
 from tokenizer import T5PegasusTokenizer
 from transformers.models.mt5.modeling_mt5 import MT5ForConditionalGeneration
@@ -21,6 +22,12 @@ output = model.generate(ids,
                             max_length=30).numpy()[0]
 print(''.join(tokenizer.decode(output[1:])).replace(' ', ''))
 ```
+### huggingface model hub
+
+|  模型名	   | MODEL_NAME  |
+|  ----  | ----  |
+| t5-pegasus-base  | imxly/t5-pegasus |
+| t5-pegasus-small  | imxly/t5-pegasus-small |
 
 ## 对比bert4keras的原版
 ```
