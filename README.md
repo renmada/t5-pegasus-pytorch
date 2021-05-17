@@ -2,8 +2,8 @@
 追一科技开源的[t5-pegasus](https://github.com/ZhuiyiTechnology/t5-pegasus)的pytorch版本
 ## 下载
 
-- base版本  百度网盘: https://pan.baidu.com/s/1yv9rVGjEmV8NJcIgm5farA 提取码: rpux
-- samll版本 百度网盘：https://pan.baidu.com/s/1vhqgjTNACo1Upu6TYWITeQ 提取码：3wzc
+- base版本  百度网盘: https://pan.baidu.com/s/1TGthgU22iZp_y1MZZMs1YA 提取码: j15c
+- samll版本 百度网盘：https://pan.baidu.com/s/1Nw5wLb6KmcCOHSLtKssq8w 提取码：9rd8
 ## how to use
 pytorch1.7.0 + transformers4.3.3
 
