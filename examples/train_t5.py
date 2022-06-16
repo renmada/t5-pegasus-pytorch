@@ -10,6 +10,39 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
+def create_optimizer(model, lr, weight_decay, custom_lr=None):
+    from collections import defaultdict
+    no_decay = 'bias|norm'
+    params = defaultdict(list)
+    custom_lr = custom_lr or dict()
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
+        in_custom = False
+        for custom_name, _ in custom_lr.items():
+            if custom_name in name:
+                if re.search(no_decay, name.lower()):
+                    params[custom_name].append(param)
+                else:
+                    params[custom_name + '_decay'].append(param)
+                in_custom = True
+                break
+        if not in_custom:
+            if re.search(no_decay, name):
+                params['normal'].append(param)
+            else:
+                params['normal_decay'].append(param)
+
+    optimizer_grouped_parameters = []
+    for k, v in params.items():
+        param_lr = custom_lr.get(k.split('_')[0], lr)
+        decay = weight_decay if 'decay' in k else 0.0
+        optimizer_grouped_parameters.append({'params': v, 'weight_decay': decay, 'lr': param_lr}, )
+
+    optimizer = AdamW(optimizer_grouped_parameters, lr=lr)
+    return optimizer
+
+
 class TaskLightModel(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
@@ -46,7 +79,7 @@ class TaskLightModel(pl.LightningModule):
             ret['rouge'] = 0
         if self.args.compute_bleu:
             ret['bleu'] = 0
-        if self.current_epoch+1 < self.args.eval_start:
+        if self.current_epoch + 1 < self.args.eval_start:
             return ret
         pred = self.predict_batch(batch)
         label = batch['decoder_input_ids'][:, 1:].cpu().numpy()
@@ -66,7 +99,7 @@ class TaskLightModel(pl.LightningModule):
             ret['rouge'] = 0
         if self.args.compute_bleu:
             ret['bleu'] = 0
-        if self.current_epoch+1 < self.args.eval_start:
+        if self.current_epoch + 1 < self.args.eval_start:
             return ret
         keys = outputs[0].keys()
         ret = {k: np.mean([x[k] for x in outputs]) for k in keys}
@@ -138,7 +171,8 @@ if __name__ == '__main__':
         model = TaskLightModel(args)
         checkpoint = pl.callbacks.ModelCheckpoint(
             dirpath=args.save_path,
-            filename='t5_copy-noise={}-{}-'.format(args.noise_prob, fold) + "{epoch:02d}-{bleu:.4f}-{rouge-1:.4f}-{rouge-2:.4f}-{rouge-l:.4f}",
+            filename='t5_copy-noise={}-{}-'.format(args.noise_prob,
+                                                   fold) + "{epoch:02d}-{bleu:.4f}-{rouge-1:.4f}-{rouge-2:.4f}-{rouge-l:.4f}",
             save_weights_only=True,
             save_on_train_epoch_end=True,
             monitor='bleu',

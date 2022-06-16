@@ -13,7 +13,7 @@
 
 
 **使用t5-copy模型transformers的版本不能高于4.12.0**
-
+pytorch-lightning<=1.4.9
 ## 下载模型
 ### huggingface model hub
 
