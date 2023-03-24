@@ -24,62 +24,70 @@ class EncoderDecoderData:
         self.args = args
         self.tokenizer = tokenizer
 
+        if self.args.noise_prob > 0:
+            self.vocab_pool = list(set(range(len(tokenizer))) - set(tokenizer.all_special_ids))
+
     def get_predict_dataloader(self):
         predict_dataset = KeyDataset(self.predict_data)
-        predict_dataloader = DataLoader(predict_dataset, batch_size=self.args.batch_size * 2,
+        predict_dataloader = DataLoader(predict_dataset,
+                                        batch_size=self.args.batch_size * 2,
                                         collate_fn=self.predict_collate)
         return predict_dataloader
 
     def read_file(self, file):
         return [json.loads(x) for x in open(file, encoding='utf-8')]
 
-    def train_collate(self, batch):
-        source = [x['src'] for x in batch]
-        target = [x['tgt'] for x in batch]
-        res = self.tokenizer(source,
+    def encode_src(self, src):
+        res = self.tokenizer(src,
                              padding=True,
                              return_tensors='pt',
-                             max_length=512,
+                             max_length=self.args.max_source_length,
                              truncation='longest_first',
                              return_attention_mask=True,
                              return_token_type_ids=False)
+        return res
 
-        target_features = self.tokenizer(target,
-                                         padding=True,
-                                         return_tensors='pt',
-                                         max_length=150,
-                                         truncation='longest_first',
-                                         return_attention_mask=True,
-                                         return_token_type_ids=False)
-        res['decoder_attention_mask'] = target_features['attention_mask']
-        res['labels'] = target_features['input_ids']
-        if self.args.noise_prob == 0.:
-            res['decoder_input_ids'] = target_features['input_ids']
-        else:
-            ids = target_features['input_ids'].clone()
-            mask = res['decoder_attention_mask']
-            noise_ids = torch.randint_like(ids, 1, 50000)
-            noise_place = np.random.random(ids.shape) < self.args.noise_prob
-            noise_place = torch.from_numpy(noise_place) & mask.bool()
-            ids = torch.where(noise_place, noise_ids, ids)
-            res['decoder_input_ids'] = ids
+    def train_collate(self, batch):
+        if isinstance(batch[0], list):
+            batch = batch[0]  # max_token_dataset
+        src = [b['src'] for b in batch]
+        tgt = [b['tgt'] for b in batch]
+
+        src_tokenized = self.encode_src(src)
+        with self.tokenizer.as_target_tokenizer():
+            tgt_tokenized = self.tokenizer(
+                tgt,
+                max_length=self.args.max_target_length,
+                padding=True,
+                return_tensors='pt',
+                truncation='longest_first')
+
+        decoder_attention_mask = tgt_tokenized['attention_mask'][:, :-1]
+        decoder_input_ids = tgt_tokenized['input_ids'][:, :-1]
+
+        labels = tgt_tokenized['input_ids'][:, 1:].clone()
+        labels.masked_fill_(labels == self.tokenizer.pad_token_id, -100)
+
+        if self.args.noise_prob > 0:
+            noise_indices = torch.rand_like(labels) < self.args.noise_prob
+            noise_indices = noise_indices & (decoder_input_ids != self.tokenizer.bos_token_id) \
+                            & (labels != self.tokenizer.eos_token_id) & decoder_attention_mask.bool()
+            noise_inp = np.random.choice(self.vocab_pool, decoder_input_ids.shape)
+            decoder_input_ids = torch.where(noise_indices, noise_inp, decoder_input_ids)
+
+        res = {'input_ids': src_tokenized['input_ids'],
+               'attention_mask': src_tokenized['attention_mask'],
+               'decoder_input_ids': decoder_input_ids,
+               'decoder_attention_mask': decoder_attention_mask,
+               'labels': labels}
         return res
 
     def dev_collate(self, batch):
         return self.train_collate(batch)
 
     def predict_collate(self, batch):
-        source = [x['src'] for x in batch]
-        ids = [x['id'] for x in batch]
-        res = self.tokenizer(source,
-                             padding=True,
-                             return_tensors='pt',
-                             max_length=self.args.max_source_length,
-                             return_attention_mask=True,
-                             return_token_type_ids=False,
-                             truncation='longest_first')
-        res['id'] = torch.tensor(list(map(int, ids)))
-        return res
+        src = [x['src'] for x in batch]
+        return self.encode_src(src)
 
     def get_dataloader(self):
         ret = {'train': [], 'dev': []}
@@ -93,7 +101,7 @@ class EncoderDecoderData:
                 train_dataloader = DataLoader(train_dataset,
                                               batch_size=self.args.batch_size,
                                               collate_fn=self.train_collate,
-                                              num_workers=self.args.num_works,
+                                              num_workers=self.args.num_workers,
                                               shuffle=True)
                 dev_dataloader = DataLoader(dev_dataset,
                                             batch_size=self.args.batch_size * 2,
@@ -101,7 +109,7 @@ class EncoderDecoderData:
                 ret['train'].append(train_dataloader)
                 ret['dev'].append(dev_dataloader)
         else:
-            if self.args.kfold == 1:
+            if self.args.kfold == 1 and self.dev_data is None:
                 from sklearn.model_selection import train_test_split
                 train_idx, dev_idx = train_test_split(range(len(self.train_data)),
                                                       test_size=0.2,
@@ -116,7 +124,7 @@ class EncoderDecoderData:
             train_dataloader = DataLoader(train_dataset,
                                           batch_size=self.args.batch_size,
                                           collate_fn=self.train_collate,
-                                          num_workers=self.args.num_works, shuffle=True)
+                                          num_workers=self.args.num_workers, shuffle=True)
             dev_dataloader = DataLoader(dev_dataset,
                                         batch_size=self.args.batch_size * 2,
                                         collate_fn=self.dev_collate)
@@ -124,21 +132,6 @@ class EncoderDecoderData:
             ret['dev'].append(dev_dataloader)
 
         return ret
-
-
-class T5PegasusTokenizer(BertTokenizer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.pre_tokenizer = partial(jieba.cut, HMM=False)
-
-    def _tokenize(self, text, *arg, **kwargs):
-        split_tokens = []
-        for text in self.pre_tokenizer(text):
-            if text in self.vocab:
-                split_tokens.append(text)
-            else:
-                split_tokens.extend(super()._tokenize(text))
-        return split_tokens
 
 
 class KeyDataset(Dataset):
@@ -159,7 +152,7 @@ def compute_bleu(label, pred, weights=None):
                     for a, b in zip(label, pred)])
 
 
-def compute_rouge(label, pred, weights=None, mode='weighted'):
+def compute_rouge(label, pred, weights=None):
     weights = weights or (0.2, 0.4, 0.4)
     if isinstance(label, str):
         label = [label]
@@ -177,47 +170,69 @@ def compute_rouge(label, pred, weights=None, mode='weighted'):
         return scores
 
     scores = np.mean([_compute_rouge(*x) for x in zip(label, pred)], axis=0)
-    if mode == 'weighted':
-        return {'rouge': sum(s * w for s, w in zip(scores, weights))}
-    elif mode == '1':
-        return {'rouge-1': scores[0]}
-    elif mode == '2':
-        return {'rouge-2':scores[1]}
-    elif mode == 'l':
-        return {'rouge-l': scores[2]}
-    elif mode == 'all':
-        return {'rouge-1': scores[0], 'rouge-2':scores[1], 'rouge-l': scores[2]}
+    return {
+        'rouge': sum(s * w for s, w in zip(scores, weights)),
+        'rouge-1': scores[0], 'rouge-2': scores[1], 'rouge-l': scores[2]
+    }
 
 
-def mask_select(inputs, mask):
-    input_dim = inputs.ndim
-    mask_dim = mask.ndim
-    mask = mask.reshape(-1).bool()
-    if input_dim > mask_dim:
-        inputs = inputs.reshape((int(mask.size(-1)), -1))[mask]
+def ce_loss(logits, labels, is_prob=False, eps=0):
+    logits = logits.view(-1, logits.size(-1))
+    labels = labels.view(-1)
+    if not is_prob:
+        loss = F.cross_entropy(logits, labels, label_smoothing=eps)
     else:
-        inputs = inputs.reshape(-1)[mask]
-    return inputs
-
-
-def copy_loss(inputs, targets, mask, eps=1e-6):
-    mask = mask[:, 1:]
-    inputs = inputs[:, :-1]
-    targets = targets[:, 1:]
-    inputs = mask_select(inputs, mask)
-    targets = mask_select(targets, mask)
-    log_preds = (inputs + eps).log()
-    loss = F.nll_loss(log_preds, targets)
+        lprob = (logits + 1e-9).log()
+        loss = F.nll_loss(lprob, labels)
     return loss
 
-def ce_loss(inputs, targets, mask):
-    mask = mask[:, 1:]
-    inputs = inputs[:, :-1]
-    targets = targets[:, 1:]
-    inputs = mask_select(inputs, mask)
-    targets = mask_select(targets, mask)
-    loss = F.cross_entropy(inputs, targets)
+
+def kl_loss(logtis, logits2, mask):
+    prob1 = F.softmax(logtis, -1)
+    prob2 = F.softmax(logits2, -1)
+    lprob1 = prob1.log()
+    lprob2 = prob2.log()
+    loss1 = F.kl_div(lprob1, lprob2, reduction='none')
+    loss2 = F.kl_div(lprob2, lprob1, reduction='none')
+    mask = (mask == 0).bool()
+    loss1 = loss1.masked_fill_(mask, 0.0).sum()
+    loss2 = loss2.masked_fill_(mask, 0.0).sum()
+    loss = (loss1 + loss2) / 2
+
     return loss
+
+
+# def mask_select(inputs, mask):
+#     input_dim = inputs.ndim
+#     mask_dim = mask.ndim
+#     mask = mask.reshape(-1).bool()
+#     if input_dim > mask_dim:
+#         inputs = inputs.reshape((int(mask.size(-1)), -1))[mask]
+#     else:
+#         inputs = inputs.reshape(-1)[mask]
+#     return inputs
+
+
+# def copy_loss(inputs, targets, mask, eps=1e-6):
+#     mask = mask[:, 1:]
+#     inputs = inputs[:, :-1]
+#     targets = targets[:, 1:]
+#     inputs = mask_select(inputs, mask)
+#     targets = mask_select(targets, mask)
+#     log_preds = (inputs + eps).log()
+#     loss = F.nll_loss(log_preds, targets)
+#     return loss
+#
+#
+# def ce_loss(inputs, targets, mask):
+#     mask = mask[:, 1:]
+#     inputs = inputs[:, :-1]
+#     targets = targets[:, 1:]
+#     inputs = mask_select(inputs, mask)
+#     targets = mask_select(targets, mask)
+#     loss = F.cross_entropy(inputs, targets)
+#     return loss
+
 
 def create_optimizer(model, lr, weight_decay, custom_lr=None):
     no_decay = 'bias|norm'
