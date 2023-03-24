@@ -51,9 +51,9 @@ python train.py \
 --model_type t5-pegasus
 ```
 ## 参考
-https://github.com/ZhuiyiTechnology/t5-pegasus
-https://github.com/fastnlp/CPT
-https://github.com/IDEA-CCNL/Fengshenbang-LM
+https://github.com/ZhuiyiTechnology/t5-pegasus  
+https://github.com/fastnlp/CPT  
+https://github.com/IDEA-CCNL/Fengshenbang-LM  
 https://github.com/microsoft/ProphetNet
 
 
