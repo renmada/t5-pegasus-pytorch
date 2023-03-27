@@ -19,11 +19,9 @@ if __name__ == '__main__':
             model = LightModel(args)
         checkpoint = pl.callbacks.ModelCheckpoint(
             dirpath=args.output_dir,
-            filename='{fold:02d}-{epoch:02d}-{bleu:.4f}-{rouge:.4f}-{rouge-1:.4f}-{rouge-2:.4f}-{rouge-l:.4f}',
             save_weights_only=True,
-            save_on_train_epoch_end=True,
-            monitor='rouge',
-            mode='max',
+            every_n_train_steps=10000,
+            save_last=True,
         )
         trainer = pl.Trainer.from_argparse_args(args, callbacks=[checkpoint], logger=False)
         trainer.fit(model, train_data, dev_data)

@@ -78,7 +78,7 @@ class LightModel(pl.LightningModule):
         if self.args.rdrop:
             logits2 = self(batch).logits
             loss = (loss + ce_loss(logits2, batch['labels'], is_prob=is_prob, eps=self.args.ls_eps)) / 2
-            loss = loss + self.rdrop_coef * kl_loss(logits, logits2, batch['decoder_attention_mask'])
+            loss = loss + self.args.rdrop_coef * kl_loss(logits, logits2, batch['decoder_attention_mask'])
 
         return loss
 
@@ -107,7 +107,7 @@ class LightModel(pl.LightningModule):
         return self.predict_batch(batch)
 
     def validation_step(self, batch, batch_idx):
-        ret = {'rouge-1': 0, 'rouge-2': 0, 'rouge-l': 0, 'bleu': 0}
+        ret = {'bleu': 0, 'rouge': 0, 'rouge-1': 0, 'rouge-2': 0, 'rouge-l': 0}
         if self.current_epoch < self.args.eval_delay:
             return ret
         pred = self.predict_batch(batch)
@@ -121,7 +121,7 @@ class LightModel(pl.LightningModule):
         return ret
 
     def validation_epoch_end(self, outputs):
-        ret = {'rouge-1': 0, 'rouge-2': 0, 'rouge-l': 0, 'bleu': 0}
+        ret = {'bleu': 0, 'rouge': 0, 'rouge-1': 0, 'rouge-2': 0, 'rouge-l': 0}
         if self.current_epoch < self.args.eval_delay:
             return ret
         keys = outputs[0].keys()

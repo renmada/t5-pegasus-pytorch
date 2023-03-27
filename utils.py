@@ -192,9 +192,9 @@ def kl_loss(logtis, logits2, mask):
     prob2 = F.softmax(logits2, -1)
     lprob1 = prob1.log()
     lprob2 = prob2.log()
-    loss1 = F.kl_div(lprob1, lprob2, reduction='none')
-    loss2 = F.kl_div(lprob2, lprob1, reduction='none')
-    mask = (mask == 0).bool()
+    loss1 = F.kl_div(lprob1, prob2, reduction='none')
+    loss2 = F.kl_div(lprob2, prob1, reduction='none')
+    mask = (mask == 0).bool().unsqueeze(-1)
     loss1 = loss1.masked_fill_(mask, 0.0).sum()
     loss2 = loss2.masked_fill_(mask, 0.0).sum()
     loss = (loss1 + loss2) / 2

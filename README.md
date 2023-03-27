@@ -4,7 +4,7 @@
 - 支持transformers最新版本
 [老版代码点这里](https://github.com/renmada/t5-pegasus-pytorch/tree/legacy)
 ## 模型效果对比
-数据集：[AdvertiseGen](https://www.luge.ai/#/luge/dataDetail?id=10)
+数据集：[LCSTS_new](https://www.luge.ai/#/luge/dataDetail?id=10)
 训练集取前一万条，验证集取前一千条
 
 | model                | bleu        | rouge-1       | rouge-2      | rouge-l      |
@@ -18,14 +18,14 @@
 
 ## huggingface模型
 
-| model_type	      | model_type                             |
-|------------------|----------------------------------------|
-| t5-pegasus-base  | imxly/t5-pegasus                       |
-| t5copy           | imxly/t5-copy                          |
-| Pegasus          | IDEA-CCNL/Randeng-Pegasus-238M-Chinese |
-| Pegasus          | IDEA-CCNL/Randeng-Pegasus-523M-Chinese |
-| cpt              | fnlp/cpt-large                         |
-| prophet          | imxly/prophetnet-zh                    |
+| model_type	 | model_type                             |
+|-------------|----------------------------------------|
+| t5-pegasus  | imxly/t5-pegasus                       |
+| t5copy      | imxly/t5-copy                          |
+| Pegasus     | IDEA-CCNL/Randeng-Pegasus-238M-Chinese |
+| Pegasus     | IDEA-CCNL/Randeng-Pegasus-523M-Chinese |
+| cpt         | fnlp/cpt-large                         |
+| prophet     | imxly/prophetnet-zh                    |
 
 
 ## 训练命令

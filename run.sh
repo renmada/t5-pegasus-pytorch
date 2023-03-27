@@ -31,7 +31,7 @@ python train.py \
 --max_target_length 300 \
 --model_path /home/xianglingyang/pretrained_models/torch/cpt-large  \
 --gpus 4 \
---lr 5e-5 --model_type cpt
+--lr 5e-5 --model_type cpt --rdrop
 
 python train.py \
 --train_file /home/xianglingyang/data/faith_gen/LCSTS_new/small_train.json \
