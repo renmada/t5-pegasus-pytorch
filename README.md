@@ -16,6 +16,8 @@
 | cpt-large            |  **0.1366** | **0.3550**    | **0.2242**   | **0.3220**   |
 | prophet-zh           | 0.1240      | 0.3419        | 0.2109       | 0.3107       |
 
+## 数据格式
+[样例数据](https://github.com/renmada/t5-pegasus-pytorch/blob/legacy/examples/sample_data.json)
 ## huggingface模型
 
 | model_type	 | model_type                             |
@@ -30,6 +32,7 @@
 
 ## 训练命令
 ### requirements
+环境可以参考这个[issue](https://github.com/renmada/t5-pegasus-pytorch/issues/58)
 ```
 torch >=1.10.0
 transformers
